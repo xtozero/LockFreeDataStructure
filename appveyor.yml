@@ -2,7 +2,7 @@ version: 1.0.{build}
 image: Visual Studio 2017
 configuration: Release
 platform: x64
-clone_folder: c:\CppProjectTemplate
+clone_folder: c:\LockFreeDataStructure
 init:
 - cmd: >-
 
@@ -34,8 +34,8 @@ before_build:
     
     cmake .. -G %generator%
 build:
-  project: c:\CppProjectTemplate\build\CppProjectTemplate.sln
+  project: c:\LockFreeDataStructure\build\LockFreeDataStructure.sln
   verbosity: minimal
   
 after_build:
-- cmd: c:\CppProjectTemplate\build\UnitTest\Release\unit_test.exe
+- cmd: c:\LockFreeDataStructure\build\UnitTest\Release\unit_test.exe

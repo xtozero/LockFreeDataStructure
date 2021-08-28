@@ -264,40 +264,40 @@ int main()
 	constexpr std::size_t ThreadCount = 8;
 	constexpr std::size_t LoopCount = 64'000'000;
 
-	{
-		LockQueue<int> lQueue;
+	//{
+	//	LockQueue<int> lQueue;
 
-		auto job1 = [&lQueue, LoopCount, ThreadCount]( )
-		{
-			for ( int i = 1; i <= LoopCount / ThreadCount; ++i )
-			{
-				if ( rand( ) % 2 == 0 || i < ( 10000 / ThreadCount ) )
-				{
-					lQueue.Push( i );
-				}
-				else
-				{
-					lQueue.Pop( );
-				}
-			}
-		};
+	//	auto job1 = [&lQueue, LoopCount, ThreadCount]( )
+	//	{
+	//		for ( int i = 1; i <= LoopCount / ThreadCount; ++i )
+	//		{
+	//			if ( rand( ) % 2 == 0 || i < ( 10000 / ThreadCount ) )
+	//			{
+	//				lQueue.Push( i );
+	//			}
+	//			else
+	//			{
+	//				lQueue.Pop( );
+	//			}
+	//		}
+	//	};
 
-		std::thread threads[ThreadCount];
+	//	std::thread threads[ThreadCount];
 
-		auto start = std::chrono::system_clock::now( );
-		for ( auto& thread : threads )
-		{
-			thread = std::thread( job1 );
-		}
+	//	auto start = std::chrono::system_clock::now( );
+	//	for ( auto& thread : threads )
+	//	{
+	//		thread = std::thread( job1 );
+	//	}
 
-		for ( auto& thread : threads )
-		{
-			thread.join( );
-		}
-		auto end = std::chrono::system_clock::now( );
+	//	for ( auto& thread : threads )
+	//	{
+	//		thread.join( );
+	//	}
+	//	auto end = std::chrono::system_clock::now( );
 
-		std::cout << std::chrono::duration_cast<std::chrono::milliseconds>( end - start ).count( ) << std::endl;
-	}
+	//	std::cout << std::chrono::duration_cast<std::chrono::milliseconds>( end - start ).count( ) << std::endl;
+	//}
 
 	{
 		LockFreeQueue<int> lfQueue;
@@ -334,8 +334,7 @@ int main()
 		std::cout << std::chrono::duration_cast<std::chrono::milliseconds>( end - start ).count( ) << std::endl;
 	}
 
-	/*
-	{
+	/*{
 		LFQUEUE lfQueue;
 
 		auto job1 = [&lfQueue, LoopCount, ThreadCount]( )
@@ -403,8 +402,8 @@ int main()
 		auto end = std::chrono::system_clock::now( );
 
 		std::cout << std::chrono::duration_cast<std::chrono::milliseconds>( end - start ).count( ) << std::endl;
-	}
-	*/
+	}*/
+
 	return 0;
 }
 

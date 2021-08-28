@@ -1,22 +1,24 @@
 #pragma once
 
+#include "SizedTypes.h"
+
 #include <iostream>
 #include <atomic>
 #include <new>
 
-template <typename T, unsigned int MaxTotalItems, unsigned int ItemsPerPage>
+template <typename T, uint32 MaxTotalItems, uint32 ItemsPerPage, uint32 PaddingForCacheLine>
 class LockFreeFixedMemoryPool
 {
 public:
-	unsigned int Allocate( unsigned int count = 1 )
+	uint32 Allocate( uint32 count = 1 )
 	{
-		unsigned int baseIdx = std::atomic_fetch_add( reinterpret_cast<std::atomic_uint32_t*>( &m_index ), count );
+		uint32 baseIdx = std::atomic_fetch_add( reinterpret_cast<std::atomic_uint32_t*>( &m_index ), count );
 		if ( baseIdx + count > MaxTotalItems )
 		{
 			throw std::bad_alloc( );
 		}
 
-		for ( unsigned int i = baseIdx, end = baseIdx + count; i < end; ++i )
+		for ( uint32 i = baseIdx, end = baseIdx + count; i < end; ++i )
 		{
 			new ( GetRawItem( i ) ) T( );
 		}
@@ -24,15 +26,15 @@ public:
 		return baseIdx;
 	}
 
-	T* GetItem( unsigned int index )
+	T* GetItem( uint32 index )
 	{
 		if ( index == 0 )
 		{
 			return nullptr;
 		}
 
-		unsigned int blockIdx = index / ItemsPerPage;
-		unsigned int itemIdx = index % ItemsPerPage;
+		uint32 blockIdx = index / ItemsPerPage;
+		uint32 itemIdx = index % ItemsPerPage;
 
 		return &m_blocks[blockIdx][itemIdx];
 	}
@@ -40,7 +42,7 @@ public:
 	LockFreeFixedMemoryPool( )
 	{
 		++m_index;
-		for ( unsigned int i = 0; i < NumBlocks; ++i )
+		for ( uint32 i = 0; i < NumBlocks; ++i )
 		{
 			m_blocks[i] = nullptr;
 		}
@@ -48,7 +50,7 @@ public:
 
 	~LockFreeFixedMemoryPool( )
 	{
-		for ( unsigned int i = 0; i < NumBlocks; ++i )
+		for ( uint32 i = 0; i < NumBlocks; ++i )
 		{
 			delete[] m_blocks[i];
 		}
@@ -60,10 +62,10 @@ public:
 	LockFreeFixedMemoryPool& operator=( LockFreeFixedMemoryPool&& ) = delete;
 
 private:
-	void* GetRawItem( unsigned int index )
+	void* GetRawItem( uint32 index )
 	{
-		unsigned int blockIdx = index / ItemsPerPage;
-		unsigned int itemIdx = index % ItemsPerPage;
+		uint32 blockIdx = index / ItemsPerPage;
+		uint32 itemIdx = index % ItemsPerPage;
 
 		if ( m_blocks[blockIdx] == nullptr )
 		{
@@ -80,11 +82,11 @@ private:
 		return static_cast<void*>( &m_blocks[blockIdx][itemIdx] );
 	}
 
-	constexpr static unsigned int NumBlocks = ( MaxTotalItems + ItemsPerPage - 1 ) / ItemsPerPage;
+	constexpr static uint32 NumBlocks = ( MaxTotalItems + ItemsPerPage - 1 ) / ItemsPerPage;
 
-	unsigned char padding[64];
-	unsigned int m_index = 0;
-	unsigned char padding1[64];
+	uint8 padding1[PaddingForCacheLine];
+	uint32 m_index = 0;
+	uint8 padding2[PaddingForCacheLine];
 	T* volatile m_blocks[NumBlocks] = {};
-	unsigned char padding2[64];
+	uint8 padding3[PaddingForCacheLine];
 };

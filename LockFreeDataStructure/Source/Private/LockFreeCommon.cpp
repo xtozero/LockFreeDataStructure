@@ -4,12 +4,13 @@
 #include <optional>
 #include <vector>
 
-LockFreeFixedMemoryPool<IndexedLockFreeLink, LockFreeLinkPolicy::MaxLockFreeLink, 16384> LockFreeLinkPolicy::m_linkAllocator;
+LockFreeFixedMemoryPool<IndexedLockFreeLink, LockFreeLinkPolicy::MaxLockFreeLink, 16384, LockFreeCacheLineBytes> LockFreeLinkPolicy::m_linkAllocator;
 
+template<uint32 PaddingForCacheLine = LockFreeCacheLineBytes>
 class LockFreeLinkFreeList
 {
 public:
-	void Push( unsigned int index )
+	void Push( uint32 index )
 	{
 		while ( true )
 		{
@@ -24,9 +25,9 @@ public:
 		}
 	}
 
-	unsigned int Pop( )
+	uint32 Pop( )
 	{
-		unsigned int index = 0;
+		uint32 index = 0;
 
 		while ( true )
 		{
@@ -51,9 +52,9 @@ public:
 	}
 
 private:
-	unsigned char padding[64];
+	uint8 padding1[PaddingForCacheLine];
 	StampIndex m_head;
-	unsigned char padding1[64];
+	uint8 padding2[PaddingForCacheLine];
 };
 
 class LockFreeLinkAllocator
@@ -75,13 +76,13 @@ public:
 				cache.m_partialBundle = m_freelistBundles.Pop( );
 				if ( cache.m_partialBundle == 0 )
 				{
-					unsigned int baseIndex = LockFreeLinkPolicy::LinkAllocator( ).Allocate( NumPerBundle );
+					uint32 baseIndex = LockFreeLinkPolicy::LinkAllocator( ).Allocate( NumPerBundle );
 
-					for ( unsigned int i = 0; i < NumPerBundle; ++i )
+					for ( uint32 i = 0; i < NumPerBundle; ++i )
 					{
 						IndexedLockFreeLink* link = LockFreeLinkPolicy::IndexToLink( baseIndex + i );
 						link->m_nextIndex = 0;
-						link->m_data = (void*)( ( unsigned long long )cache.m_partialBundle );
+						link->m_data = (void*)( (uptrint)cache.m_partialBundle );
 						cache.m_partialBundle = baseIndex + i;
 					}
 				}
@@ -89,16 +90,16 @@ public:
 			cache.m_numPartial = NumPerBundle;
 		}
 
-		unsigned int index = cache.m_partialBundle;
+		uint32 index = cache.m_partialBundle;
 		IndexedLockFreeLink* link = LockFreeLinkPolicy::IndexToLink( index );
-		cache.m_partialBundle = (unsigned int)( ( unsigned long long )( link->m_data ) );
+		cache.m_partialBundle = (uint32)( (uptrint)( link->m_data ) );
 		--cache.m_numPartial;
 		link->m_data = nullptr;
 
 		return index;
 	}
 
-	void Dealloc( unsigned int index )
+	void Dealloc( uint32 index )
 	{
 		ThreadLocalCache& cache = GetLocalCache( );
 		if ( cache.m_numPartial >= NumPerBundle )
@@ -116,7 +117,7 @@ public:
 		IndexedLockFreeLink* link = LockFreeLinkPolicy::IndexToLink( index );
 		link->m_nextStampIndex.SetIndex( 0 );
 		link->m_nextIndex = 0;
-		link->m_data = (void*)( ( unsigned long long )cache.m_partialBundle );
+		link->m_data = (void*)( ( uint64 )cache.m_partialBundle );
 
 		cache.m_partialBundle = index;
 		++cache.m_numPartial;
@@ -137,9 +138,9 @@ public:
 private:
 	struct ThreadLocalCache
 	{
-		unsigned int m_fullBundle = 0;
-		unsigned int m_partialBundle = 0;
-		unsigned int m_numPartial = 0;
+		uint32 m_fullBundle = 0;
+		uint32 m_partialBundle = 0;
+		uint32 m_numPartial = 0;
 	};
 
 	ThreadLocalCache& GetLocalCache( )
@@ -153,13 +154,13 @@ private:
 		return m_tlsCache[m_tlsSlot];
 	}
 
-	static constexpr int NumPerBundle = 64;
+	static constexpr int32 NumPerBundle = 64;
 	static constexpr std::size_t UninitializedSlot = (std::numeric_limits<std::size_t>::max)();
 
 	static thread_local std::size_t m_tlsSlot;
 	static thread_local std::vector<ThreadLocalCache> m_tlsCache;
 
-	LockFreeLinkFreeList m_freelistBundles;
+	LockFreeLinkFreeList<> m_freelistBundles;
 };
 
 thread_local std::vector<LockFreeLinkAllocator::ThreadLocalCache> LockFreeLinkAllocator::m_tlsCache;
@@ -167,12 +168,12 @@ thread_local std::size_t LockFreeLinkAllocator::m_tlsSlot = UninitializedSlot;
 
 static LockFreeLinkAllocator g_lockFreeLinkAllocator;
 
-unsigned int LockFreeLinkPolicy::AllocLockFreeLink( )
+uint32 LockFreeLinkPolicy::AllocLockFreeLink( )
 {
 	return g_lockFreeLinkAllocator.Alloc( );
 }
 
-void LockFreeLinkPolicy::DeallocLockFreeLink( unsigned int item )
+void LockFreeLinkPolicy::DeallocLockFreeLink( uint32 item )
 {
 	g_lockFreeLinkAllocator.Dealloc( item );
 }

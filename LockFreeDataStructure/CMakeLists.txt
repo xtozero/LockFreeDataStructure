@@ -2,6 +2,8 @@ set (Header
 	./Source/Public/LockFreeCommon.h
 	./Source/Public/LockFreeFixedMemoryPool.hpp
 	./Source/Public/LockFreeList.hpp
+	./Source/Public/LockFreeQueue.hpp
+	./Source/Public/SizedTypes.h
 )
  
 set (SOURCE

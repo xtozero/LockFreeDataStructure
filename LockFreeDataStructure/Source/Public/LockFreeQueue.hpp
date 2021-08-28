@@ -1,16 +1,17 @@
 #pragma once
 
 #include "LockFreeCommon.h"
+#include "SizedTypes.h"
 
 #include <chrono>
 
-template <typename T>
+template <typename T, uint32 PaddingForCacheLine = LockFreeCacheLineBytes>
 class LockFreeQueue
 {
 public:
 	void Push( T* data )
 	{
-		unsigned int newData = LockFreeLinkPolicy::AllocLockFreeLink( );
+		uint32 newData = LockFreeLinkPolicy::AllocLockFreeLink( );
 		LockFreeLinkPolicy::IndexToLink( newData )->m_data = data;
 
 		while ( true )
@@ -18,9 +19,10 @@ public:
 			StampIndex last = m_tail;
 			IndexedLockFreeLink* lastLink = LockFreeLinkPolicy::IndexToLink( last.GetIndex( ) );
 			StampIndex next = lastLink->m_nextStampIndex;
-			if ( last == m_tail )
+			StampIndex lastForTest = m_tail;
+			if ( last == lastForTest )
 			{
-				unsigned int nextIndex = next.GetIndex( );
+				uint32 nextIndex = next.GetIndex( );
 				if ( next.GetIndex( ) == 0 )
 				{
 					StampIndex newNext;
@@ -51,15 +53,14 @@ public:
 
 	T* Pop( )
 	{
-		using namespace std::chrono;
-
 		while ( true )
 		{
 			StampIndex first = m_head;
 			StampIndex last = m_tail;
 			IndexedLockFreeLink* firstLink = LockFreeLinkPolicy::IndexToLink( first.GetIndex( ) );
 			StampIndex next = firstLink->m_nextStampIndex;
-			if ( first == m_head )
+			StampIndex firstForTest = m_head;
+			if ( first == firstForTest )
 			{
 				if ( first.GetIndex( ) == last.GetIndex( ) )
 				{
@@ -95,7 +96,7 @@ public:
 
 	LockFreeQueue( )
 	{
-		unsigned int sentinel = LockFreeLinkPolicy::AllocLockFreeLink( );
+		uint32 sentinel = LockFreeLinkPolicy::AllocLockFreeLink( );
 		m_head.SetIndex( sentinel );
 		m_tail.SetIndex( sentinel );
 	}
@@ -106,9 +107,9 @@ public:
 	}
 
 private:
-	unsigned char padding[64];
+	uint8 padding1[PaddingForCacheLine];
 	StampIndex m_head;
-	unsigned char padding1[64];
+	uint8 padding2[PaddingForCacheLine];
 	StampIndex m_tail;
-	unsigned char padding2[64];
+	uint8 padding3[PaddingForCacheLine];
 };

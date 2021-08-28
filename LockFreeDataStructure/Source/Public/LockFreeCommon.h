@@ -1,44 +1,47 @@
 #pragma once
 
 #include "LockFreeFixedMemoryPool.hpp"
+#include "SizedTypes.h"
 
 #include <atomic>
 #include <limits>
 
 #include <Windows.h>
 
+constexpr uint32 LockFreeCacheLineBytes = 64;
+
 struct alignas(8) StampIndex
 {
 public:
-	void Set( unsigned int index, unsigned int stamp )
+	void Set( uint32 index, uint32 stamp )
 	{
-		m_stampIndex = ( static_cast<unsigned long long>( stamp ) << IndexBits ) | index;
+		m_stampIndex = ( static_cast<uint64>( stamp ) << IndexBits ) | index;
 	}
 
-	void SetIndex( unsigned int index )
+	void SetIndex( uint32 index )
 	{
 		Set( index, GetStamp( ) );
 	}
 
-	void SetStamp( unsigned int stamp )
+	void SetStamp( uint32 stamp )
 	{
 		Set( GetIndex( ), stamp );
 	}
 
-	unsigned int GetIndex( ) const
+	uint32 GetIndex( ) const
 	{
-		return static_cast<unsigned int>( m_stampIndex );
+		return static_cast<uint32>( m_stampIndex );
 	}
 
-	unsigned int GetStamp( ) const
+	uint32 GetStamp( ) const
 	{
-		return static_cast<unsigned int>( m_stampIndex >> IndexBits );
+		return static_cast<uint32>( m_stampIndex >> IndexBits );
 	}
 
 	bool CompareExchange( const StampIndex& expected, const StampIndex& desired )
 	{
-		unsigned long long expectedStampIndex = expected.m_stampIndex;
-		return std::atomic_compare_exchange_strong( reinterpret_cast<std::atomic_llong*>( this ), reinterpret_cast<long long*>( &expectedStampIndex ), desired.m_stampIndex );
+		uint64 expectedStampIndex = expected.m_stampIndex;
+		return std::atomic_compare_exchange_strong( reinterpret_cast<std::atomic_llong*>( this ), reinterpret_cast<int64*>( &expectedStampIndex ), desired.m_stampIndex );
 	}
 
 	constexpr StampIndex( ) = default;
@@ -50,44 +53,13 @@ public:
 	{
 		if ( this != &other )
 		{
-			if constexpr ( sizeof( void* ) == 8 )
-			{
-				m_stampIndex = std::atomic_load( reinterpret_cast<const std::atomic_llong*>( &other ) );
-			}
-			else
-			{
-				unsigned long long expectedStampIndex = m_stampIndex;
-				std::atomic_compare_exchange_strong( reinterpret_cast<std::atomic_llong*>( this ), reinterpret_cast<long long*>( &expectedStampIndex ), other.m_stampIndex );
-			}
+			m_stampIndex = std::atomic_load( reinterpret_cast<const std::atomic_llong*>( &other ) );
 		}
 
 		return *this;
 	}
-	StampIndex( StampIndex&& other )
-	{
-		( *this ) = std::move( other );
-	}
-	StampIndex& operator=( StampIndex&& other )
-	{
-		if ( this != &other )
-		{
-			if constexpr ( sizeof( void* ) == 8 )
-			{
-				m_stampIndex = std::atomic_load( reinterpret_cast<const std::atomic_llong*>( &other.m_stampIndex ) );
-				other.m_stampIndex = 0;
-			}
-			else
-			{
-				unsigned long long expectedStampIndex = m_stampIndex;
-				std::atomic_compare_exchange_strong( reinterpret_cast<std::atomic_llong*>( this ), reinterpret_cast<long long*>( &expectedStampIndex ), other.m_stampIndex );
-
-				expectedStampIndex = other.m_stampIndex;
-				std::atomic_compare_exchange_strong( reinterpret_cast<std::atomic_llong*>( &other ), reinterpret_cast<long long*>( &expectedStampIndex ), 0LL );
-			}
-		}
-
-		return *this;
-	}
+	StampIndex( StampIndex&& other ) = delete;
+	StampIndex& operator=( StampIndex&& other ) = delete;
 
 	friend bool operator==( const StampIndex& lhs, const StampIndex& rhs )
 	{
@@ -100,34 +72,34 @@ public:
 	}
 
 private:
-	static constexpr unsigned int IndexBits = std::numeric_limits<unsigned int>::digits;
-	unsigned long long m_stampIndex = 0;
+	static constexpr uint32 IndexBits = std::numeric_limits<uint32>::digits;
+	uint64 m_stampIndex = 0;
 };
 
 struct IndexedLockFreeLink
 {
 	StampIndex m_nextStampIndex;
 	void* m_data;
-	unsigned int m_nextIndex;
+	uint32 m_nextIndex;
 };
 
 struct LockFreeLinkPolicy
 {
-	constexpr static unsigned int MaxLockFreeLink = 1 << 26;
+	constexpr static uint32 MaxLockFreeLink = 1 << 26;
 
-	static IndexedLockFreeLink* IndexToLink( unsigned int index )
+	static IndexedLockFreeLink* IndexToLink( uint32 index )
 	{
 		return m_linkAllocator.GetItem( index );
 	}
 
-	static unsigned int AllocLockFreeLink( );
-	static void DeallocLockFreeLink( unsigned int item );
+	static uint32 AllocLockFreeLink( );
+	static void DeallocLockFreeLink( uint32 item );
 
-	static LockFreeFixedMemoryPool<IndexedLockFreeLink, MaxLockFreeLink, 16384>& LinkAllocator( )
+	static LockFreeFixedMemoryPool<IndexedLockFreeLink, MaxLockFreeLink, 16384, LockFreeCacheLineBytes>& LinkAllocator( )
 	{
 		return m_linkAllocator;
 	}
 
 private:
-	static LockFreeFixedMemoryPool<IndexedLockFreeLink, MaxLockFreeLink, 16384> m_linkAllocator;
+	static LockFreeFixedMemoryPool<IndexedLockFreeLink, MaxLockFreeLink, 16384, LockFreeCacheLineBytes> m_linkAllocator;
 };

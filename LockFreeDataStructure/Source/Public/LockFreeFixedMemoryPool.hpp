@@ -87,6 +87,6 @@ private:
 	uint8 padding1[PaddingForCacheLine];
 	uint32 m_index = 0;
 	uint8 padding2[PaddingForCacheLine];
-	T* volatile m_blocks[NumBlocks] = {};
+	T* m_blocks[NumBlocks] = {};
 	uint8 padding3[PaddingForCacheLine];
 };

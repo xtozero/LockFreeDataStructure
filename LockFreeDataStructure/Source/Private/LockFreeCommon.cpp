@@ -157,14 +157,13 @@ private:
 	static constexpr int32 NumPerBundle = 64;
 	static constexpr std::size_t UninitializedSlot = (std::numeric_limits<std::size_t>::max)();
 
-	static thread_local std::size_t m_tlsSlot;
+	std::size_t m_tlsSlot = UninitializedSlot;
 	static thread_local std::vector<ThreadLocalCache> m_tlsCache;
 
 	LockFreeLinkFreeList<> m_freelistBundles;
 };
 
 thread_local std::vector<LockFreeLinkAllocator::ThreadLocalCache> LockFreeLinkAllocator::m_tlsCache;
-thread_local std::size_t LockFreeLinkAllocator::m_tlsSlot = UninitializedSlot;
 
 static LockFreeLinkAllocator g_lockFreeLinkAllocator;
 
